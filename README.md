@@ -1,4 +1,0 @@
-pcopy
-=====
-
-Parallel Copy

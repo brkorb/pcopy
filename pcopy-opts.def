@@ -1,0 +1,217 @@
+
+AutoGen Definitions options;
+
+prog-name = pcopy;
+
+copyright = {
+    date  = "2012";
+    owner = "Bruce Korb";
+    eaddr = 'autogen-users@lists.sourceforge.net';
+    type  = gpl;
+};
+
+prog-title     = "Parallel copy";
+argument       = "[ <file> ... ]";
+version        = '0.3';
+homerc         =  $HOME, ".";
+environrc;
+usage-opt;
+long-opts;
+no-xlate       = anything;
+config-header  = pcopy-cfg.h;
+die-code       = '    if (curses_active) endwin();';
+usage-message;
+usage          = pcopy_usage;
+
+main = {
+  main-type    = for-each;
+  handler-proc = pcopy;
+  handler-type = name-of-file;
+  main-init    = <<- _EOF_
+	    if (! HAVE_OPT(QUIET)) {
+	        initscr();
+	        curses_active = true;
+	    }
+	    pth_list = malloc(OPT_VALUE_THREAD_CT * sizeof(*pth_list));
+	    if (pth_list == NULL)
+	        fserr(PCOPY_EXIT_NO_MEM, "allocate", "pthread list");
+	_EOF_;
+  main-fini    = '    if (curses_active) endwin();';
+};
+
+exit-name[2]   = no-mem;
+exit-desc[2]   = 'Insufficient memory to operate';
+
+exit-name[3]   = fs-err-in;
+exit-desc[3]   = 'File system error accessing source';
+
+exit-name[4]   = fs-err-out;
+exit-desc[4]   = 'File system error writing output';
+
+exit-name[5]   = bad-config;
+exit-desc[5]   = 'The specified configuration is @i{not supported}';
+
+export = <<- _EOExport_
+	extern pthread_t  *    pth_list;
+	extern pthread_mutex_t tty_mutex;
+	extern pthread_cond_t  th_start_cond;
+	extern pthread_mutex_t th_start_mutex;
+
+	extern bool            curses_active;
+	extern uint64_t        nsec_per_iteration;
+	extern unsigned long   iteration_chunk;
+	_EOExport_;
+
+include = <<- _EOInclude_
+	pthread_t *     pth_list           = NULL;
+	pthread_mutex_t tty_mutex          = PTHREAD_MUTEX_INITIALIZER;
+	pthread_cond_t  th_start_cond      = PTHREAD_COND_INITIALIZER;
+	pthread_mutex_t th_start_mutex     = PTHREAD_MUTEX_INITIALIZER;
+
+	bool            curses_active      = false;
+	uint64_t        nsec_per_iteration = 0;
+	unsigned long   iteration_chunk    = 0;
+	_EOInclude_;
+
+flag = {
+    name        = limits;
+    documentation;
+
+    descrip     = 'How many / how long / how much specifications.';
+};
+
+flag = {
+    name        = thread-ct;
+    value       = t;
+    arg-type    = number;
+    arg-name    = count;
+    arg-default = 8;
+    descrip     = "limit copy threads to @code{count}";
+
+    doc = <<-  _EOF_
+	By default, 8 threads are run in parallel.  The file is divided into
+	roughly 8 equal pieces, with each a multiple of the optimal transfer
+	size.  The read threads and write threads each open an independent
+	file pointer, seek to the appropriate offset and start copying.
+	_EOF_;
+};
+
+flag = {
+    name        = flow-rate;
+    value       = f;
+    arg-type    = number;
+    scaled;
+    arg-name    = bytes;
+    descrip     = "maximum @code{bytes} per second flow";
+
+    doc = <<-  _EOF_
+	Constrain aggregate transfer rate to so many bytes per second.
+	For a 10 megabit pipe, half capacity is about 500K bytes per second.
+	Each thread will be constrained to its portion of the total.
+	_EOF_;
+};
+
+flag = {
+    name        = max-chunk;
+    value       = c;
+    arg-type    = number;
+    scaled;
+    arg-name    = bytes;
+    arg-default = 16384;
+    descrip     = "maximum @code{bytes} per read chunk";
+    settable;
+
+    doc = "Constrain each transfer to not more than @i{bytes} of data.";
+};
+
+flag = {
+    name        = where;
+    documentation;
+
+    descrip     = 'Where to put the output.';
+};
+
+flag = {
+    name        = destination;
+    value       = d;
+    arg-type    = string;
+    arg-name    = dest;
+    descrip     = "Copy files to the @code{dest} destination";
+
+    doc = <<-  _EOF_
+	By default, the source file[s] is [are] copied to the current directory.
+	If you are copying from multiple sources, you must ensure that there are
+	not any name conflicts.  With this option, you can specify an alternate
+	destination directory or the full output file name.  If the destination
+	file exists, it is removed before copying begins.  If there are multiple
+	input files, then this option must specify a directory.
+	_EOF_;
+};
+
+flag = {
+    name        = information;
+    documentation;
+
+    descrip     = 'User information.';
+};
+
+flag = {
+    name        = quiet;
+    value       = q;
+    descrip     = "omit progress output";
+
+    doc = <<-  _EOF_
+	Normally, each thread prints its progress as each read finishes.
+	The entire screen is taken over and each thread is assigned a line
+	for its output.  This will suppress that.
+	_EOF_;
+};
+
+detail = "Copy a file in several chunks in parallel.";
+
+doc-section = {
+    ds-type   = DESCRIPTION;
+    ds-format = texi;
+    ds-text   = <<- _END_MAN_DESCRIP
+	This program is intended to copy a file between a network mounted file
+	system and local storage.  If you have a really large file (like a
+	crash dump or an ISO image), the @command{cp(1)} or even
+	@command{rsync(1)} programs can take an extrordinarly long time.  The
+	network link may be fast enough, but each piece of the file must be
+	acknowledged before the next piece is sent.  Several instances of
+	@command{dd(1)} ought to work, but on CIFS mounts, the instances that
+	need to seek to their assigned offset will often fail.
+
+	This program uses pthreads.  Each thread is assigned a segment of the
+	file to copy.  Each thread starts serially so that there is no
+	thundering herd of pthreads all trying to open the remote file at the
+	same time.  You wouldn't like it if it were to do so.  There is also a
+	@command{flow-rate} option so that you can avoid clogging the capacity
+	of your network link.  (You will need to know your own limits, though,
+	because this program won't figure it out.)
+
+
+	_END_MAN_DESCRIP;
+};
+
+doc-section = {
+    ds-type   = 'SEE ALSO';
+    ds-format = texi;
+    ds-text   = "cp(1), rsync(1) and dd(1)";
+};
+
+doc-section = {
+    ds-type     = EXAMPLES;
+    ds-format   = texi;
+    ds-text     = <<- _EndOfMan_
+	@example
+	@command{pcopy} @option{--flow-rate}=500k @option{--thread-ct}=16 @file{/path/to/large.iso}
+	@end example
+
+	This command will copy @file{large.iso} to the current directory.
+	It will self-limit to 500,000 bytes per second, or about half of
+	a 10 megabit connection.  The copy operation will be split up into
+	16 different sections with each read and write operation constrained
+	to the default maximum chunk size of 16K (16384) bytes.
+	_EndOfMan_;
+};

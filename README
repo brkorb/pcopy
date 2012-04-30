@@ -1,0 +1,12 @@
+pcopy
+=====
+
+Parallel Copy
+
+This product is only assured to build under Linux.
+It *may* work on other platforms, but until it gets
+autoconfiscated, there are no guarantees.  To build
+from scratch, you must have the AutoGen project fully
+installed, version 5.16 or later.
+
+As of 5/1/2012, it has not been released.  :)  Be patient
