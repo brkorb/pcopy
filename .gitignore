@@ -1,0 +1,5 @@
+/pcopy
+/pcopy-opts.?
+*.o
+pcopy.1
+/stamp-*
