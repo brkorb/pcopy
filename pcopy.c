@@ -6,6 +6,21 @@
 #define pc_min(_1, _2) (((_1) < (_2)) ? (_1) : (_2))
 
 /**
+ * strdup or die.  Do not return without memory.
+ *
+ * @param[in] istr  input string
+ * @results   a newly allocated string
+ */
+static inline char *
+strdup_or_die(char const * istr)
+{
+    char * res = strdup(istr);
+    if (res == NULL)
+        fserr(PCOPY_EXIT_NO_MEM, "strdup", istr);
+    return res;
+}
+
+/**
  * The input read was short.  Formulate a somewhat more complex
  * "fserr()" exit call.
  */
@@ -213,7 +228,7 @@ make_dest_name(char const * sname)
         if (p == NULL)
             usage_message(no_dir, sname);
         unlink(++p);
-        return strdup(p);
+        return strdup_or_die(p);
     }
 
     {
@@ -236,7 +251,7 @@ make_dest_name(char const * sname)
                         "destination for multiple sources is one file");
                 been_here = true;
                 unlink(dname);
-                return strdup(dname);
+                return strdup_or_die(dname);
             }
             errno = EINVAL;
             fserr(PCOPY_EXIT_BAD_CONFIG,
@@ -249,7 +264,7 @@ make_dest_name(char const * sname)
          * successfully stat our destination file and trip over the
          * "been_here" flag.
          */
-        dname = strdup(dname);
+        dname = strdup_or_die(dname);
         been_here = true;
         {
             static char const bad_stat[] = "stat-ing dir portion";
