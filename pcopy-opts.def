@@ -12,7 +12,7 @@ copyright = {
 
 prog-title     = "Parallel copy";
 argument       = "[ <file> ... ]";
-version        = '0.3';
+version        = '0.4';
 homerc         =  $HOME, ".";
 environrc;
 usage-opt;
@@ -52,13 +52,38 @@ exit-name[5]   = bad-config;
 exit-desc[5]   = 'The specified configuration is @i{not supported}';
 
 export = <<- _EOExport_
+	/*! @var List of pthreads doing the copies. */
 	extern pthread_t  *    pth_list;
+
+	/*! @var for accessing curses functions. */
 	extern pthread_mutex_t tty_mutex;
+
+	/*! @var Thread start is done condition variable.
+	 * The main thread must wait for each thread to open the input
+	 * and output files before starting the next thread.
+	 * Bad things happen if you do not wait.
+	 */
 	extern pthread_cond_t  th_start_cond;
+
+	/*! @var Condition variable accessor mutex. */
 	extern pthread_mutex_t th_start_mutex;
 
+	/*! @var Whether initscr() has been called.
+	 *  It is set false after a call to endwin(). */
 	extern bool            curses_active;
+
+	/*! @var minimum amount of time to consume per chunk.
+	 * If the flow-rate option has been specified, then this value is
+	 * computed based on that rate, the number of threads and the chunk
+	 * size.  The read thread sleeps if it finishes early.
+	 */
 	extern uint64_t        nsec_per_iteration;
+
+	/*! @var The size of the read for each iteration.
+	 * It is forced to be a multiple of the optimal size for a read.
+	 * That value is obtained from a stat() call.  The default value
+	 * is 16K (0x4000) bytes.
+	 */
 	extern unsigned long   iteration_chunk;
 	_EOExport_;
 

@@ -6,6 +6,7 @@ GCC := $(CC) $(CFLAGS) -std=c99 -g -O4
 CAG := $(shell autoopts-config cflags)
 LAG := $(shell autoopts-config ldflags) -lpthread -lncurses
 OBJ := $(SRC:.c=.o)
+DOC := $(EXE).1 $(EXE).texi doxy-pcopy
 
 default : $(EXE)
 all     : default $(EXE).1
@@ -22,7 +23,7 @@ $(EXE)  : $(OBJ)
 .c.o :
 	$(GCC) -c -o $@ $(CAG) $<
 
-install : all
+install : all doxy-install
 	install -t /usr/local/bin $(EXE) ; \
 	install -t /usr/local/man/man1 $(EXE).1
 
@@ -32,12 +33,20 @@ stamp-pcopy-opts : pcopy-opts.def
 $(EXE).1 : pcopy-opts.def
 	autogen -Tagman-cmd.tpl $<
 
+doxy-pcopy     : $(SRC) $(HDR) pcopy.doxy
+	autogen -T doxygen.tpl pcopy-opts.def
+
+doxy-install   : doxy-pcopy
+	rm -rf ~/public_html/pcopy ; \
+	cp -frp $</html ~/public_html/pcopy
+
 clean  :
-	rm -f *~ $(OBJ) pcopy-opts.d-*
+	rm -f *~ $(OBJ) pcopy-opts.d-* doxy.err
 
 clobber : clean
 	rm -f stamp-* $(EXE) $(EXE).1 $(EXE)-*.tar.xz \
 	      $(AUTOGEN_stamp_pcopy_opts_TList) pcopy-opts.d
+	rm -rf doxy-pcopy
 
 tarball : $(GEN) $(EXE).1 $(SRC) Makefile pcopy-opts.def
 	eval $$(sed -n "/^version/s/[ ;']//gp" pcopy-opts.def) ; \
@@ -52,4 +61,5 @@ tarball : $(GEN) $(EXE).1 $(SRC) Makefile pcopy-opts.def
 	test -d $(EXE)-$$version ; \
 	cd $(EXE)-$$version ; make ; cd - ; rm -rf $(EXE)-$$version
 
-.PHONY : gen all clean clobber tarball
+.PHONY : gen all clean clobber tarball doxy-install
+

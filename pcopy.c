@@ -1,8 +1,33 @@
+/**
+ * @mainpage pcopy Parallel Copy
+ *
+ * @section intro Introduction
+ *
+ * @include README
+ */
+/**
+ * @file pcopy.c
+ * This file defines the procedures called from generated code.
+ * pcopy() and pcopy_usage(), plus the support routines they need.
+ *
+ * @file pcopy-opts.c
+ * This file contains pure generated code, derived from pcopy-opts.def.
+ * It includes a main() procedure which will call pcopy() for each file
+ * name found either on the command line or from reading standard input.
+ *
+ * @file pcopy-opts.h
+ * This file contains pure generated code, derived from pcopy-opts.def.
+ */
 
 #include "pcopy-opts.h"
 
+/** the number of lines reserved at the top of the status page */
 #define HDR_LINES 2
+
+/** the line number to use for displaying info from a particular thread */
 #define ENTRY_LINE  (HDR_LINES + 2 * fseg->idx)
+
+/** the minimum value of the two arguments */
 #define pc_min(_1, _2) (((_1) < (_2)) ? (_1) : (_2))
 
 /**
@@ -23,6 +48,11 @@ strdup_or_die(char const * istr)
 /**
  * The input read was short.  Formulate a somewhat more complex
  * "fserr()" exit call.
+ *
+ * @param[in,out] fseg  The descriptor of the segment that was being copied.
+ * @param[in]     rdlen the length of the attempted read.
+ * @param[in]     rdct  the count of bytes actually read.
+ * @noreturn
  */
 static void
 short_read(file_seg_t * fseg, ssize_t rdlen, ssize_t rdct)
@@ -39,7 +69,7 @@ short_read(file_seg_t * fseg, ssize_t rdlen, ssize_t rdct)
 /**
  * Return nanoseconds since start of copy.
  *
- * @returns  a 64 bit unsigned integer.
+ * @returns nanoseconds since program start as a 64 bit unsigned integer.
  */
 uint64_t
 get_time_delta(void)
@@ -113,6 +143,14 @@ copy_start(file_seg_t * fseg)
     fseg->lastt = get_time_delta();
 }
 
+/**
+ *  Show copy progress.  The display happens if "quiet" has not been
+ *  specified.  This function will also sleep, if "flow-rate" has
+ *  been specified and the time since the last segment read has been
+ *  too short.
+ *
+ * @param[in,out] fseg  file segment descriptor.  "lastt" may be updated.
+ */
 void
 copy_progress(file_seg_t * fseg)
 {
@@ -149,8 +187,14 @@ copy_progress(file_seg_t * fseg)
     }
 }
 
+/**
+ * Copy wrapup.  If "quiet" has not been specified, then
+ * print a message to the curses screen about this thread being done.
+ *
+ * @param[in] fseg  file segment descriptor.
+ */
 void
-copy_wrap(file_seg_t * fseg, size_t ttl_size)
+copy_wrap(file_seg_t * fseg)
 {
     if (HAVE_OPT(QUIET))
         return;
@@ -161,20 +205,23 @@ copy_wrap(file_seg_t * fseg, size_t ttl_size)
     move(ENTRY_LINE, 0);
     clrtoeol();
     printw("th %2d DONE - copied 0x%08X bytes in %lu seconds",
-           fseg->idx, ttl_size, get_time_delta() / BILLION);
+           fseg->idx, fseg->end - fseg->start, get_time_delta() / BILLION);
     refresh();
     pthread_mutex_unlock(&tty_mutex);
 }
 
 /**
- * Copy thread code.
+ * Copy thread code.  This copies one segment in parallel with the other
+ * segments.  It is copied in reads and writes of several k-bytes at a time.
+ *
+ * @param[in] arg the file_seg_t pointer describing the segment to copy.
  */
 static void *
 do_copy(void * arg)
 {
     file_seg_t * fseg = arg;
-    size_t const ttl_size = fseg->end - fseg->start;
-    size_t const readlim  = pc_min(ttl_size, OPT_VALUE_MAX_CHUNK);
+    size_t const readlim  =
+        pc_min(fseg->end - fseg->start, OPT_VALUE_MAX_CHUNK);
 
     copy_start(fseg);
 
@@ -201,7 +248,7 @@ do_copy(void * arg)
         }
     }
 
-    copy_wrap(fseg, ttl_size);
+    copy_wrap(fseg);
     free(arg);
     pthread_exit(0);
 }
@@ -317,7 +364,7 @@ new_file_seg(char const * sfile, char const * dfile, size_t start, size_t seg_le
 }
 
 /**
- * The callout function that invokes the optionUsage function, but first
+ * The callout function that invokes the optionUsage() function, but first
  * makes sure "endwin()" gets called.
  *
  * @param opts  the AutoOpts option description structure
@@ -348,13 +395,20 @@ start_copy(pthread_t * pth, void * arg)
     (void)nanosleep(&ts, NULL);
 }
 
+/**
+ * Copy parts of a file in parallel.  They are copied into place in the output
+ * file.  Various options determine where to put the output file, how to split
+ * it up, and how many bytes per second should be consumed with the process.
+ *
+ * @param[in] fn the input file name.
+ */
 void
 pcopy(char const * fn)
 {
     char const * dname = make_dest_name(fn);
     size_t base_size;
     size_t seg_size;
-    size_t modulus;
+    size_t xfer_sz;
     int    ix = 0;
 
     if (strcmp(fn, dname) == 0)
@@ -370,25 +424,25 @@ pcopy(char const * fn)
             fserr(PCOPY_EXIT_FS_ERR_IN, "regular file check", fn);
         }
         base_size = sb.st_size;
-        modulus   = sb.st_blksize;
+        xfer_sz   = sb.st_blksize;
     }
 
     {
         size_t sz = base_size / OPT_VALUE_THREAD_CT;
 
         /*
-         * Now make sure seg_size is an even multiple of modulus
+         * Now make sure seg_size is an even multiple of xfer_sz
          * and that thread-ct * size >= base_size
          */
-        seg_size = modulus * (sz / modulus);
+        seg_size = xfer_sz * (sz / xfer_sz);
         if ((seg_size * OPT_VALUE_THREAD_CT) < base_size)
-            seg_size += modulus;
+            seg_size += xfer_sz;
     }
 
     {
-        size_t sz = (OPT_VALUE_MAX_CHUNK / modulus) * modulus;
+        size_t sz = (OPT_VALUE_MAX_CHUNK / xfer_sz) * xfer_sz;
         if (sz == 0)
-            sz = modulus;
+            sz = xfer_sz;
         OPT_VALUE_MAX_CHUNK = sz;
     }
 
@@ -409,11 +463,11 @@ pcopy(char const * fn)
 
     memset(pth_list, 0, OPT_VALUE_THREAD_CT * sizeof(*pth_list));
 
-    for (modulus = 0; modulus < base_size; ix++) {
-        file_seg_t * fseg = new_file_seg(fn, dname, modulus, seg_size);
+    for (xfer_sz = 0; xfer_sz < base_size; ix++) {
+        file_seg_t * fseg = new_file_seg(fn, dname, xfer_sz, seg_size);
 
-        modulus    += seg_size;
-        fseg->end   = modulus;
+        xfer_sz    += seg_size;
+        fseg->end   = xfer_sz;
         if (fseg->end > base_size)
             fseg->end = base_size;
         fseg->idx   = ix;
