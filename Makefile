@@ -6,10 +6,10 @@ GCC := $(CC) $(CFLAGS) -std=c99 -g -O0
 CAG := $(shell autoopts-config cflags)
 LAG := $(shell autoopts-config ldflags) -lpthread -lncurses
 OBJ := $(SRC:.c=.o)
-DOC := $(EXE).1 $(EXE).texi doxy-pcopy
+DOC := $(EXE).1 $(EXE).texi $(EXE).info doxy-pcopy
 
 default : $(EXE)
-all     : default $(EXE).1
+all     : default $(DOC)
 
 GEN     := pcopy-opts.h pcopy-opts.c
 gen     : $(GEN)
@@ -37,6 +37,9 @@ $(EXE).1        : pcopy-opts.def
 
 $(EXE).texi     : pcopy-opts.def
 	autogen -DLEVEL=document -T agtexi-cmd pcopy-opts.def
+
+$(EXE).info     : $(EXE).texi
+	makeinfo $<
 
 doxy-pcopy      : $(SRC) $(HDR) pcopy.doxy
 	autogen -T doxygen.tpl pcopy-opts.def
