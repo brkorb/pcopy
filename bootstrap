@@ -2,6 +2,17 @@
 
 # A bootstrap is necessary IFF autogen is not up to date.
 
+declare -r prog=$(basename $0 .sh)
+declare -r progpid=$$
+
+die() {
+    echo "$prog fatal error:  $*"
+    kill -TERM $progpid
+    sleep 1
+    kill -KILL $progpid
+    exit 1
+} >&2
+
 untar() {
     tar -xf pcopy-gen.tar
     touch stamp-pcopy-opts
@@ -9,11 +20,57 @@ untar() {
     exit 0
 }
 
-ag=$(command -v autogen)
-test -x "$ag" || untar
+dotar() {
+    tdir=$(mktemp -d $PWD/tar-XXXXXX)
+    test -d "$tdir" || die "cannot make temp directory"
+    shift
+    tfil=$PWD/$1 ; shift
 
-agv=$($ag -v | sed 's/.*) *//;s/pre.*//')
-set -- $(IFS='.' ; set -- $agv ; echo $*)
-if test $1 -eq 5 && test $2 -lt 16
-then untar
-fi
+    for f
+    do
+        test -d "$f" && {
+            cp -frp "$f" ${tdir}
+            continue
+        }
+
+        case "$f" in
+        pcopy-opts.c )
+            tag='#ifndef __doxygen__'
+            echo "$tag"
+            sed "1,/$tag/d" $f
+            ;;
+
+        pcopy-opts.h )
+            tag='#ifndef AUTOOPTS_PCOPY_OPTS_H_GUARD'
+            echo "$tag"
+            sed "1,/$tag/d
+                /#define AO_TEMPLATE_VERSION/,/#endif/d" $f
+            ;;
+
+        * )
+            cat $f
+            ;;
+        esac > ${tdir}/$f
+    done
+
+    cd $tdir
+    tar cvf $tfil $*
+    cd -
+    rm -rf $tdir
+}
+
+untar_check() {
+    ag=$(command -v autogen)
+    test -x "$ag" || untar
+
+    agv=$($ag -v | sed 's/.*) *//;s/pre.*//')
+    set -- $(IFS='.' ; set -- $agv ; echo $*)
+    if test $1 -eq 5 && test $2 -lt 16
+    then untar
+    fi
+}
+
+case "$1" in
+tar ) dotar $* ;;
+*   ) untar_check ;;
+esac

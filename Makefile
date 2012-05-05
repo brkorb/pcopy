@@ -6,7 +6,9 @@ GCC := $(CC) $(CFLAGS) -std=c99 -g -O0
 CAG := $(shell autoopts-config cflags)
 LAG := $(shell autoopts-config ldflags) -lpthread -lncurses
 OBJ := $(SRC:.c=.o)
-DOC := $(EXE).1 $(EXE).texi $(EXE).info doxy-pcopy
+REG_DOC := $(EXE).1 $(EXE).texi $(EXE).info
+DXY_DOC := doxy-pcopy
+DOC := $(REG_DOC) $(DXY_DOC)
 
 default : $(EXE)
 all     : default $(DOC)
@@ -59,5 +61,5 @@ tarball : $(GEN) $(DOC) $(SRC) Makefile mk-tarball.sh
 
 .PHONY : gen all clean clobber tarball doxy-install
 
-pcopy-gen.tar : stamp-pcopy-opts $(DOC)
-	tar cf $@ pcopy-opts.[ch] $(DOC)
+pcopy-gen.tar : stamp-pcopy-opts $(REG_DOC) bootstrap
+	$(SHELL) bootstrap tar $@ pcopy-opts.[ch] $(REG_DOC)
