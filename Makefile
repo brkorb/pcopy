@@ -59,3 +59,5 @@ tarball : $(GEN) $(DOC) $(SRC) Makefile mk-tarball.sh
 
 .PHONY : gen all clean clobber tarball doxy-install
 
+pcopy-gen.tar : stamp-pcopy-opts $(DOC)
+	tar cf $@ pcopy-opts.[ch] $(DOC)

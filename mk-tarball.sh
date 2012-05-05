@@ -20,9 +20,13 @@ ln ${EXE}-opts.def *.[ch] ${EXE}.1 ${EXE}.texi ${EXE}.info \
    ${EXE}-${version}/.
 ln doxy-${EXE}/html/* ${EXE}-${version}/doc/html/.
 
-sed '/^stamp/,$d
-     /^all /,/^-include.*opts/d' Makefile \
-  > ${EXE}-${version}/Makefile
+{
+    sed '/^stamp/,$d
+        /^all /,/^-include.*opts/d' Makefile
+    printf '\n\n$(SRC) $(HDR) : stamp-pcopy-opts\n'
+    printf '\ttar -xf pcopy-gen.tar\n'
+    printf '\ttouch $@ ; touch `tar -tf pcopy-gen.tar`'
+} > ${EXE}-${version}/Makefile
 
 tar  -cvJf ${EXE}-${version}.tar.xz ${EXE}-${version}
 rm   -rf ${EXE}-${version}
