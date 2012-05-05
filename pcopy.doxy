@@ -119,11 +119,6 @@ WARN_LOGFILE           = doxy.err
 INPUT                  =
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c *.h
-
-# The RECURSIVE tag can be used to turn specify whether or not subdirectories
-# should be searched for input files as well. Possible values are YES and NO.
-# If left blank NO is used.
-
 RECURSIVE              = YES
 EXCLUDE                =
 EXCLUDE_SYMLINKS       = NO
@@ -261,41 +256,14 @@ LATEX_BIB_STYLE        = plain
 # configuration options related to the RTF output
 #---------------------------------------------------------------------------
 GENERATE_RTF           = NO
-RTF_OUTPUT             = rtf
-COMPACT_RTF            = NO
-RTF_HYPERLINKS         = NO
-RTF_STYLESHEET_FILE    =
-RTF_EXTENSIONS_FILE    =
-
-#---------------------------------------------------------------------------
-# configuration options related to the man page output
-#---------------------------------------------------------------------------
-GENERATE_MAN           = YES
-MAN_OUTPUT             = man
-MAN_EXTENSION          = .3
-MAN_LINKS              = NO
-
-#---------------------------------------------------------------------------
-# configuration options related to the XML output
-#---------------------------------------------------------------------------
+GENERATE_MAN           = NO
 GENERATE_XML           = NO
-XML_OUTPUT             = xml
-XML_SCHEMA             =
-XML_DTD                =
-XML_PROGRAMLISTING     = YES
+GENERATE_PERLMOD       = NO
 
 #---------------------------------------------------------------------------
 # configuration options for the AutoGen Definitions output
 #---------------------------------------------------------------------------
 GENERATE_AUTOGEN_DEF   = YES
-
-#---------------------------------------------------------------------------
-# configuration options related to the Perl module output
-#---------------------------------------------------------------------------
-GENERATE_PERLMOD       = NO
-PERLMOD_LATEX          = NO
-PERLMOD_PRETTY         = YES
-PERLMOD_MAKEVAR_PREFIX =
 
 #---------------------------------------------------------------------------
 # Configuration options related to the preprocessor

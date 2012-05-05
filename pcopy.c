@@ -136,6 +136,14 @@ copy_start(file_seg_t * fseg)
             fserr(PCOPY_EXIT_FS_ERR_OUT, "seek (out)", fseg->dname);
     }
 
+    if (posix_fadvise(fseg->fdin, fseg->start, fseg->end - fseg->start,
+                      POSIX_FADV_SEQUENTIAL) != 0)
+        fserr(PCOPY_EXIT_FS_ERR_IN, "fadvise(r)", fseg->fname);
+
+    if (posix_fadvise(fseg->fdout, fseg->start, fseg->end - fseg->start,
+                      POSIX_FADV_SEQUENTIAL) != 0)
+        fserr(PCOPY_EXIT_FS_ERR_OUT, "fadvise(w)", fseg->dname);
+
     pthread_mutex_lock(&th_start_mutex);
     pthread_cond_signal(&th_start_cond);
     pthread_mutex_unlock(&th_start_mutex);
@@ -225,27 +233,22 @@ do_copy(void * arg)
 
     copy_start(fseg);
 
-    {
-        int fdin  = fseg->fdin;
-        int fdout = fseg->fdout;
+    for (;;) {
+        ssize_t rdlen = fseg->end - fseg->start;
+        if (rdlen > readlim)
+            rdlen = readlim;
+        ssize_t rdct = read(fseg->fdin, fseg->buffer, rdlen);
+        if (rdct <= 0)
+            short_read(fseg, rdlen, rdct);
 
-        for (;;) {
-            ssize_t rdlen = fseg->end - fseg->start;
-            if (rdlen > readlim)
-                rdlen = readlim;
-            ssize_t rdct = read(fdin, fseg->buffer, rdlen);
-            if (rdct <= 0)
-                short_read(fseg, rdlen, rdct);
+        rdlen = write(fseg->fdout, fseg->buffer, rdct);
+        if (rdlen != rdct)
+            fserr(PCOPY_EXIT_FS_ERR_OUT, "write", fseg->dname);
 
-            rdlen = write(fdout, fseg->buffer, rdct);
-            if (rdlen != rdct)
-                fserr(PCOPY_EXIT_FS_ERR_OUT, "write", fseg->dname);
-
-            fseg->start += rdlen;
-            if (fseg->start >= fseg->end)
-                break;
-            copy_progress(fseg);
-        }
+        fseg->start += rdlen;
+        if (fseg->start >= fseg->end)
+            break;
+        copy_progress(fseg);
     }
 
     copy_wrap(fseg);
@@ -285,10 +288,13 @@ make_dest_name(char const * sname)
 
         if (stat(dname, &sb) == 0) {
             if (S_ISDIR(sb.st_mode)) {
-                char * p = malloc(strlen(dname) + strlen(sname) + 2);
+                char const * bn = strrchr(sname, '/');
+                char * p;
+                bn = bn ? (bn + 1) : sname;
+                p  = malloc(strlen(dname) + strlen(bn) + 2);
                 if (p == NULL)
                     fserr(PCOPY_EXIT_NO_MEM, "allocating", "destination name");
-                sprintf(p, "%s/%s", dname, sname);
+                sprintf(p, "%s/%s", dname, bn);
                 unlink(p);
                 return p;
             }

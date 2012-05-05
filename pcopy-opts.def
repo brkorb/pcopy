@@ -102,7 +102,7 @@ flag = {
     name        = limits;
     documentation;
 
-    descrip     = 'How many / how long / how much specifications.';
+    descrip     = 'How many / how long / how much specifications';
 };
 
 flag = {
@@ -153,7 +153,7 @@ flag = {
     name        = where;
     documentation;
 
-    descrip     = 'Where to put the output.';
+    descrip     = 'Where to put the output';
 };
 
 flag = {
@@ -177,7 +177,7 @@ flag = {
     name        = information;
     documentation;
 
-    descrip     = 'User information.';
+    descrip     = 'User information';
 };
 
 flag = {

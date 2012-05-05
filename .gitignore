@@ -5,3 +5,6 @@ pcopy.1
 /stamp-*
 /pcopy-*.tar.*
 /doxy[-.]*
+pcopy.info
+pcopy.menu
+pcopy.texi
