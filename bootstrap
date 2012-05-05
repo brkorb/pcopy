@@ -1,0 +1,19 @@
+#! /bin/sh
+
+# A bootstrap is necessary IFF autogen is not up to date.
+
+untar() {
+    tar -xf pcopy-gen.tar
+    touch stamp-pcopy-opts
+    touch $(tar -tf pcopy-gen.tar)
+    exit 0
+}
+
+ag=$(command -v autogen)
+test -x "$ag" || untar
+
+agv=$($ag -v | sed 's/.*) *//;s/pre.*//')
+set -- $(IFS='.' ; set -- $agv ; echo $*)
+if test $1 -eq 5 && test $2 -lt 16
+then untar
+fi
